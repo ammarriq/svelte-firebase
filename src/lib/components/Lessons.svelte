@@ -65,17 +65,10 @@
 								{loadedLessons + i + 1}
 							</td>
 							<td class="px-6 py-2">
-								<a
-									class="group flex items-center gap-1 hover:underline"
-									href="/wordinator/{id}/setup"
-								>
-									<p class="grid"><span class="truncate">{name}</span></p>
-
-									>
-								</a>
+								<p class="grid"><span class="truncate">{name}</span></p>
 							</td>
 							<td class="whitespace-nowrap px-6 py-2">
-								{wordList.map((w) => w.text).join(', ')}
+								{wordList.join(', ')}
 							</td>
 						</tr>
 						{#each Array(PER_PAGE - (lessons.docs.length ?? 0)) as _}

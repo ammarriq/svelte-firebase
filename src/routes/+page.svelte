@@ -13,7 +13,5 @@
 
 <div class="mb-6 space-y-6">
 	<WordForm />
-
 	<Lessons baseConstraints={[orderBy('name', 'desc')]} title="My Lessons" />
-	<Lessons baseConstraints={[orderBy('name', 'desc')]} title="Sharred Lessons" />
 </div>
