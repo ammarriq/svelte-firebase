@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { db } from '$lib/firebase'
+	import { db } from './utils'
 	import {
 		QuerySnapshot,
 		Timestamp,

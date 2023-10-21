@@ -1,4 +1,5 @@
-import { db } from '$lib/firebase'
+import { PUBLIC_FIREBASE_CONFIG } from '$env/static/public'
+import { initializeApp } from 'firebase/app'
 import {
 	Firestore,
 	QueryConstraint,
@@ -6,7 +7,8 @@ import {
 	collection,
 	getDocs,
 	query,
-	type DocumentData
+	type DocumentData,
+	getFirestore
 } from 'firebase/firestore'
 
 type Wordinator = {
@@ -17,6 +19,10 @@ type Wordinator = {
 	wordList: string[]
 	archive: boolean
 }
+
+const app = initializeApp(JSON.parse(PUBLIC_FIREBASE_CONFIG))
+
+export const db = getFirestore(app)
 
 export const getLessons = async (firestore: Firestore, constraints: QueryConstraint[]) => {
 	const q = query(collection(db, 'lessons'), ...constraints)
