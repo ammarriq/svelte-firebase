@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { db } from './utils'
+	import { db } from './firestore'
 	import {
 		QuerySnapshot,
 		Timestamp,
@@ -10,30 +10,37 @@
 		type DocumentData,
 		endBefore,
 		limitToLast,
-		startAfter
+		startAfter,
+		Firestore,
+		QueryConstraint,
+		query,
+		getDocs
 	} from 'firebase/firestore'
 	import { onMount } from 'svelte'
-	import { getLessons, snapshotToLessons } from './utils'
+	import '../app.css'
+
+	type Wordinator = { id: string; name: string }
 
 	const PER_PAGE = 2
 
 	let lessons: QuerySnapshot<DocumentData, DocumentData> | null = null
 	let loadedLessons = 0
-	let words = ''
+
+	const getLessons = async (firestore: Firestore, constraints: QueryConstraint[]) => {
+		const q = query(collection(db, 'lessons'), ...constraints)
+		const lessons = await getDocs(q)
+
+		return lessons
+	}
+
+	const snapshotToLessons = (snapshot: QuerySnapshot<DocumentData, DocumentData>) => {
+		return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wordinator[]
+	}
 
 	const submit = async () => {
-		const wordsObj = words
-			.split(',')
-			.map((word) => word.trim())
-			.filter((word) => word.length)
-
 		await addDoc(collection(db, 'lessons'), {
-			name: `lesson-${new Date()}`,
-			createdOn: Timestamp.now(),
-			wordList: wordsObj
+			name: `lesson-${new Date()}`
 		})
-
-		words = ''
 	}
 
 	onMount(async () => {
@@ -41,109 +48,80 @@
 	})
 </script>
 
-<div class="mb-6 space-y-6">
-	<form class="flex flex-col gap-4 sm:flex-row" on:submit|preventDefault={submit}>
-		<input
-			name="words"
-			class="border w-full px-4 py-2"
-			type="text"
-			placeholder="Comma (,) separated words"
-			bind:value={words}
-		/>
-		<button class="w-32 border py-2" type="submit"> Add Word </button>
+<div>
+	<form on:submit|preventDefault={submit}>
+		<button type="submit"> Add Lesson </button>
 	</form>
 
-	<div class="overflow-x-auto">
-		<!-- * lessons table -->
-		{#if db && lessons}
-			<table class="w-full">
-				<thead>
+	<!-- * lessons table -->
+	{#if db && lessons}
+		<table>
+			<thead>
+				<tr>
+					<th>No.</th>
+					<th>Name</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each snapshotToLessons(lessons) as { name }, i (i)}
 					<tr>
-						<th class="px-6 py-2 text-left text-sm w-32">No.</th>
-						<th class="px-6 py-2 text-left text-sm w-60">Name</th>
-						<th class="px-6 py-2 text-left text-sm">Words</th>
+						<td>
+							{loadedLessons + i + 1}
+						</td>
+						<td>
+							<p>{name}</p>
+						</td>
 					</tr>
-				</thead>
-				<tbody>
-					{#each snapshotToLessons(lessons) as { name, wordList }, i (i)}
-						<tr>
-							<td class="whitespace-nowrap px-6 py-2">
-								{loadedLessons + i + 1}
-							</td>
-							<td class="px-6 py-2">
-								<p class="grid"><span class="truncate">{name}</span></p>
-							</td>
-							<td class="whitespace-nowrap px-6 py-2">
-								{wordList.join(', ')}
-							</td>
-						</tr>
-						{#each Array(PER_PAGE - (lessons.docs.length ?? 0)) as _}
-							<tr>
-								<td class="py-2">&nbsp;</td>
-								<td class="py-2">&nbsp;</td>
-								<td class="py-2">&nbsp;</td>
-							</tr>
-						{/each}
-					{:else}
-						<tr>
-							<td class="py-2 text-center text-sm italic" colspan="3"> No lessons found. </td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
+				{:else}
+					<tr>
+						<td colspan="2"> No lessons found. </td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
 
-			<div class="flex justify-center gap-1 mt-4">
-				<!-- * prev btn -->
-				<button
-					class="h-9 w-9 font-bold border disabled:opacity-40"
-					disabled={loadedLessons <= 0}
-					type="button"
-					on:click={async () => {
-						const firstDoc = lessons?.docs.at(0)
-						if (!firstDoc) return
+		<div class="btn-wrapper">
+			<!-- ? prev btn -->
+			<button
+				disabled={loadedLessons <= 0}
+				type="button"
+				on:click={async () => {
+					const firstDoc = lessons?.docs.at(0)
+					if (!firstDoc) return
 
-						lessons = await getLessons(db, [
-							orderBy('name', 'desc'),
-							endBefore(firstDoc),
-							limitToLast(PER_PAGE)
-						])
+					lessons = await getLessons(db, [
+						orderBy('name', 'desc'),
+						endBefore(firstDoc),
+						limitToLast(PER_PAGE)
+					])
 
-						loadedLessons -= PER_PAGE
-					}}
-				>
-					{'<'}
-				</button>
+					loadedLessons -= PER_PAGE
+				}}
+			>
+				{'<'}
+			</button>
 
-				<!-- * next btn -->
-				<button
-					class="h-9 w-9 font-bold border disabled:opacity-40"
-					disabled={lessons.docs.length < PER_PAGE}
-					type="button"
-					on:click={async () => {
-						const lastDoc = lessons?.docs.at(-1)
-						if (!lastDoc) return
+			<!-- ? next btn -->
+			<button
+				disabled={lessons.docs.length < PER_PAGE}
+				type="button"
+				on:click={async () => {
+					const lastDoc = lessons?.docs.at(-1)
+					if (!lastDoc) return
 
-						lessons = await getLessons(db, [
-							orderBy('name', 'desc'),
-							startAfter(lastDoc),
-							limit(PER_PAGE)
-						])
+					lessons = await getLessons(db, [
+						orderBy('name', 'desc'),
+						startAfter(lastDoc),
+						limit(PER_PAGE)
+					])
 
-						loadedLessons += PER_PAGE
-					}}
-				>
-					{'>'}
-				</button>
-			</div>
-		{:else}
-			<div class="text-center">Loading...</div>
-		{/if}
-	</div>
+					loadedLessons += PER_PAGE
+				}}
+			>
+				{'>'}
+			</button>
+		</div>
+	{:else}
+		<div style:text-align="center">Loading...</div>
+	{/if}
 </div>
-
-<style lang="postcss">
-	th,
-	td {
-		@apply border;
-	}
-</style>
