@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { db } from './firestore'
 	import {
 		QuerySnapshot,
-		Timestamp,
 		addDoc,
 		collection,
 		limit,
@@ -11,50 +9,48 @@
 		endBefore,
 		limitToLast,
 		startAfter,
-		Firestore,
 		QueryConstraint,
 		query,
 		getDocs
 	} from 'firebase/firestore'
 	import { onMount } from 'svelte'
 	import '../app.css'
+	import { PUBLIC_FIREBASE_CONFIG } from '$env/static/public'
+	import { initializeApp } from 'firebase/app'
+	import { getFirestore } from 'firebase/firestore'
 
-	type Wordinator = { id: string; name: string }
+	const app = initializeApp(JSON.parse(PUBLIC_FIREBASE_CONFIG))
+	const firestore = getFirestore(app)
+	const collectionName = 'foobar'
+	const collectionRef = collection(firestore, collectionName)
 
-	const PER_PAGE = 2
+	const ITEM_PER_PAGE = 2
 
-	let lessons: QuerySnapshot<DocumentData, DocumentData> | null = null
-	let loadedLessons = 0
+	let snapshot: QuerySnapshot<DocumentData, DocumentData> | null = null
+	let documentCount = 0
 
-	const getLessons = async (firestore: Firestore, constraints: QueryConstraint[]) => {
-		const q = query(collection(db, 'lessons'), ...constraints)
-		const lessons = await getDocs(q)
-
-		return lessons
+	const updateContraints = async (constraints: QueryConstraint[]) => {
+		snapshot = await getDocs(query(collectionRef, ...constraints))
 	}
 
-	const snapshotToLessons = (snapshot: QuerySnapshot<DocumentData, DocumentData>) => {
-		return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Wordinator[]
-	}
-
-	const submit = async () => {
-		await addDoc(collection(db, 'lessons'), {
-			name: `lesson-${new Date()}`
-		})
+	const snapshotObject = () => {
+		if (!snapshot) return []
+		return snapshot.docs.map((doc) => doc.data()) as { name: string }[]
 	}
 
 	onMount(async () => {
-		lessons = await getLessons(db, [orderBy('name', 'desc'), limit(PER_PAGE)])
+		updateContraints([orderBy('name', 'desc'), limit(ITEM_PER_PAGE)])
 	})
 </script>
 
 <div>
-	<form on:submit|preventDefault={submit}>
-		<button type="submit"> Add Lesson </button>
+	<!-- add form -->
+	<form on:submit|preventDefault={() => addDoc(collectionRef, { name: new Date() })}>
+		<button type="submit">Add Lesson</button>
 	</form>
 
-	<!-- * lessons table -->
-	{#if db && lessons}
+	{#if firestore && snapshot}
+		<!-- * table -->
 		<table>
 			<thead>
 				<tr>
@@ -63,39 +59,35 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each snapshotToLessons(lessons) as { name }, i (i)}
+				{#each snapshotObject() as { name }, i (i)}
 					<tr>
-						<td>
-							{loadedLessons + i + 1}
-						</td>
-						<td>
-							<p>{name}</p>
-						</td>
+						<td>{documentCount + i + 1} </td>
+						<td>{name}</td>
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="2"> No lessons found. </td>
+						<td colspan="2">No data</td>
 					</tr>
 				{/each}
 			</tbody>
 		</table>
 
-		<div class="btn-wrapper">
+		<div>
 			<!-- ? prev btn -->
 			<button
-				disabled={loadedLessons <= 0}
+				disabled={documentCount <= 0}
 				type="button"
 				on:click={async () => {
-					const firstDoc = lessons?.docs.at(0)
+					const firstDoc = snapshot?.docs.at(0)
 					if (!firstDoc) return
 
-					lessons = await getLessons(db, [
+					await updateContraints([
 						orderBy('name', 'desc'),
 						endBefore(firstDoc),
-						limitToLast(PER_PAGE)
+						limitToLast(ITEM_PER_PAGE)
 					])
 
-					loadedLessons -= PER_PAGE
+					documentCount -= ITEM_PER_PAGE
 				}}
 			>
 				{'<'}
@@ -103,19 +95,19 @@
 
 			<!-- ? next btn -->
 			<button
-				disabled={lessons.docs.length < PER_PAGE}
+				disabled={snapshot.docs.length < ITEM_PER_PAGE}
 				type="button"
 				on:click={async () => {
-					const lastDoc = lessons?.docs.at(-1)
+					const lastDoc = snapshot?.docs.at(-1)
 					if (!lastDoc) return
 
-					lessons = await getLessons(db, [
+					await updateContraints([
 						orderBy('name', 'desc'),
 						startAfter(lastDoc),
-						limit(PER_PAGE)
+						limit(ITEM_PER_PAGE)
 					])
 
-					loadedLessons += PER_PAGE
+					documentCount += ITEM_PER_PAGE
 				}}
 			>
 				{'>'}
