@@ -47,6 +47,8 @@
 </script>
 
 <div>
+	{Intl.DateTimeFormat().resolvedOptions().timeZone}
+
 	<!-- add form -->
 	<form on:submit|preventDefault={() => addDoc(collectionRef, { name: new Date() })}>
 		<button type="submit">Add Lesson</button>
